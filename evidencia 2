@@ -1,0 +1,315 @@
+import datetime
+import random
+import re
+import string
+from prettytable import PrettyTable
+import csv
+
+notas_cancel  = {}
+notas_ing = {}
+
+def menu():
+    leer_csv(notas_ing)
+    
+    while True:
+        print("bienvenido al taller mecanico\n\n")
+
+        print("1. Registrar una nota")
+        print("2. Consultas y reportes")
+        print("3. Cancelar una nota")
+        print("4. Recuperar una nota")
+        print("5. Salir")
+        eleccion = input('\nElija una opción (con un numero del 1 al 5): ')
+
+        if eleccion == '1':
+            registrar_nota()
+        elif eleccion == '2':
+            consultar_notas()
+        elif eleccion == '3':    
+            cancelar_nota()
+        elif eleccion == '4':
+            recuperar_nota()
+        elif eleccion == '5':
+            guardar_csv(notas_ing)
+            break
+        else:
+            print('Por favor, sólo las opciones disponibles')
+
+
+def generar_rfc():
+            while True:
+                rfc = input("Ingrese su RFC o escriba 'aleatorio' para generar uno automáticamente: ")
+                if rfc.lower() == "aleatorio":
+                    rfc = generar_rfc_aleatorio()
+                    print(f"RFC generado automáticamente: {rfc}")
+                    return rfc
+                elif re.match(r'^[A-Z]{4}[0-9]{6}[A-Z0-9]{3}$', rfc):
+                    return rfc
+                else:
+                    print("RFC no válido. El RFC debe tener el formato AAAA######AAA (letras mayúsculas y números).")
+
+def generar_rfc_aleatorio():
+    # Genera tres letras aleatorias
+    letras = ''.join(random.choice(string.ascii_uppercase) for _ in range(3))
+    
+    # Genera seis dígitos aleatorios
+    digitos = ''.join(random.choice(string.digits) for _ in range(6))
+    
+    # Genera dos caracteres alfanuméricos aleatorios
+    caracteres = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(2))
+    
+    # Combina los elementos anteriores en un RFC válido
+    rfc = letras + digitos + caracteres
+    
+    return rfc
+
+            
+def registrar_nota():
+    fecha_actual = datetime.date.today()  # Obtener la fecha actual del sistema
+    while True:
+        try:
+            fecha = input('Ingrese la fecha (dd/mm/aaaa): ')
+            dia, mes, anio = map(int, fecha.split('/'))
+            fecha_ingresada = datetime.date(anio, mes, dia)
+
+            if fecha_ingresada > fecha_actual:
+                print("La fecha no puede ser posterior a la fecha actual del sistema.")
+            else:
+                break
+        except ValueError:
+            print("Por favor, ingrese el formato correspondiente")
+
+    while True:
+                nombre = input("Ingrese su nombre por favor: ")
+                if nombre.strip():
+                    break
+                else:
+                    print("Inténtelo de nuevo.")
+
+########Correo
+    while True:
+        correo = input("Ingrese su correo electrónico: ")
+        if re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', correo):
+            break
+        else:
+            print("Correo electrónico no válido. Inténtelo de nuevo.")
+    # Llama a la función generar_rfc para obtener el RFC del cliente
+    rfc = generar_rfc()
+    
+    servicios = []
+    monto_total=0
+    while True:
+        nombre_servicio = input("Ingrese el nombre del servicio (si desea cancelar, presione 'f'): ")
+        if nombre_servicio.lower() == 'f':
+            break
+        while True:
+            try:
+                costo_serv = float(input(f"Ingrese el costo del servicio '{nombre_servicio}': "))
+            except ValueError:
+                print("Por favor, ingrese un costo válido.")
+            else:
+                if costo_serv > 0:
+                    servicios.append((nombre_servicio, costo_serv)) 
+                    break
+                else:
+                    print('El precio del servicio tiene que ser mayor a 0.')
+
+    monto_total = sum(costo_serv for _, costo_serv in servicios)
+    folio = max(notas_ing.keys(), default=000) + 1
+    notas_ing[folio] = (fecha, nombre, rfc, correo, servicios, monto_total)
+    print(f"Nota de folio {folio}")
+    print(f"Fecha: {fecha}")
+    print(f"Cliente: {nombre}")
+    print(f"RFC: {rfc}")
+    print("Servicios:")
+    for nombre_servicio, costo_serv in servicios:
+        print(f"- {nombre_servicio}: ${costo_serv}")
+    print(f"Costo total: ${monto_total}")
+    
+    return
+
+
+
+def consultar_notas():
+    resp = ""
+    while resp == "":
+        print("Consultas")
+        print("1. Consulta por periodo")
+        print("2. Consulta por folio")
+        print("3 - Consultar por cliente")
+        print("4. Volver al menu principal")
+
+        while True:
+            try:
+                consulta = int(input('Elija una opción (con un numero del 1 al 4): '))
+                
+            except ValueError:
+                print ("Por favor, ingresa un dato valido")
+            else:
+                    if consulta > 0 and consulta <= 4:
+                        break
+                    else:
+                        print('Por favor, sólo las opciones disponibles')
+        if consulta == 4:
+            return
+        while True:
+            if consulta == 1:
+                
+                inicio = input("podrias darme la fecha inicial(en formato dd/mm/aaaa): (Si se omite se tomará como fecha inicial 01/01/2000)")
+                if inicio == "":
+                    inicio = "01/01/2000"
+                inicio = datetime.datetime.strptime(inicio,"%d/%m/%Y").date()    
+                            
+                final = input("podrias darme la fecha final (en formato dd/mm/aaaa): (Si se omite se tomará como fecha final la fecha actual) ")
+                if final == "":
+                    final= datetime.date.today()
+                else: 
+                    final = datetime.datetime.strptime(final, '%d/%m/%Y').date()
+                
+                tabla = PrettyTable()
+                tabla.field_names = [ "Folio","Cliente","Fecha", "RFC", "Correo","Servicio", "Monto total"]
+                for folio, (fecha, cliente, rfc, correo, servicios, monto_total) in notas_ing.items():
+                    fecha_p = datetime.datetime.strptime(fecha, '%d/%m/%Y').date()
+                    if inicio <= fecha_p <= final:
+                        tabla.add_row([folio, cliente, fecha, rfc, correo,
+                                        '\n'.join([f"{nombre_servicio}" for nombre_servicio,_ in servicios]),
+                                        f'${monto_total:.2f}'])
+
+                print(tabla)
+                return
+
+            elif consulta == 2:
+                
+                try:
+                    folio = int(input('podrías darme el folio que quieres consultar: '))
+                except ValueError:
+                    print('Ese no es un folio válido. Intenta de nuevo\n')
+                else:
+                    if folio in notas_ing:
+                        datos_g = notas_ing[folio] 
+                        print("Datos de la nota:")
+                        print(f"fecha: {datos_g[0]}")
+                        print(f"Cliente: {datos_g[1]}")
+                        print(f"RFC: {datos_g[2]}")
+                        print(f"Correo: {datos_g[3]}")
+                        print(f"Servicio: {datos_g[4]}")
+                        print(f"Monto: {datos_g[5]}")
+                    elif folio in notas_cancel:
+                        print("Esta nota ha sido cancelada.")
+                    else:
+                        print("Este folio no se encuentra en el sistema.")
+                    break
+                   
+            elif consulta == 3:
+                    print("Consulta por cliente")
+                    clientes = sorted([datos[2] for datos in notas_ing.values()])
+                    folio_cliente = {}
+                    for i, cliente in enumerate(clientes, start=1):
+                        folio_cliente[i] = cliente
+                        print(f"{i} - {cliente}")
+
+                    while True:
+                        try:
+                            seleccion = int(input("Seleccione el número del cliente que desea consultar: "))
+                            if seleccion in folio_cliente:
+                                cliente_seleccionado = folio_cliente[seleccion]
+                                break
+                            else:
+                                print("Selección no válida. Inténtelo de nuevo.")
+                        except ValueError:
+                            print("Solamente se aceptan valores numéricos. Inténtelo de nuevo.")
+                        except Exception:
+                            print("Opción no válida. Inténtelo de nuevo.")
+                    notas_cliente = {folio : datos for folio, datos in notas_ing.items() if folio == seleccion}
+                    print(notas_cliente)
+
+                    if notas_cliente:
+                                print(f"Notas para el cliente: {cliente_seleccionado}")
+                                tabla_cliente = PrettyTable()
+                                tabla_cliente.field_names = ["Folio", "Fecha", "Cliente", "RFC", "Correo", "Servicio", "Total a Pagar"]
+                                for folio, datos in notas_cliente.items():
+                                    fecha, cliente, rfc, correo, servicios, total_costo = datos
+                                    tabla_cliente.add_row([folio, fecha, cliente, rfc, correo, "\n".join([f"{servicio}: ${costo:.2f}" for servicio, costo in servicios]), f"${total_costo:.2f}"])
+                                print(tabla_cliente)
+                                
+                                montos_notas_cliente = [total_costo for _, _, _, _, _, total_costo in notas_cliente.values()]
+                                monto_promedio = sum(montos_notas_cliente) / len(montos_notas_cliente)
+                                print(f"Monto promedio de las notas del cliente: ${monto_promedio:.2f}")
+
+                                input('Contiuar')
+                                break
+                    else:
+                        print(f"No se encontraron notas para el cliente: {cliente_seleccionado}")               
+        resp=""
+        
+#################
+def cancelar_nota(notas_ing, notas_cancel):
+    folio = int(input("Por favor, proporcione el folio de la nota que desea cancelar: "))
+    if folio in notas_ing:
+        datos_g = notas_ing[folio]
+        print("\nDetalles de la nota que desea cancelar:")
+        print(f"Folio: {folio}")
+        print(f"Fecha: {datos_g[0]}")
+        print(f"Cliente: {datos_g[1]}")
+        print("Servicios:")
+        for servicio, costo in datos_g[2]:
+            print(f"- {servicio}: ${costo}")
+        print(f"Monto total: ${datos_g[3]}")
+        confirmacion = input("¿Está seguro de que desea cancelar esta nota? (Sí/No): ").lower()
+        if confirmacion == "si":
+            notas_ing.pop(folio)
+            notas_cancel[folio] = datos_g
+            print("Nota cancelada con éxito.")
+        else:
+            print("La cancelación de la nota ha sido cancelada.")
+    else:
+        print("El folio de la nota especificada no existe o corresponde a una nota cancelada.")
+
+    return notas_ing, notas_cancel
+
+
+
+
+def recuperar_nota(notas_ing, notas_cancel):
+    print("Notas canceladas:")
+    print("Folio | Fecha | Cliente | Monto Total")
+    
+    for folio, datos in notas_cancel.items():
+        print(f"{folio} | {datos[0]} | {datos[1]} | {datos[3]}")
+    
+    folio_a_recuperar = int(input("Indique el folio de la nota que desea recuperar (o 0 para volver al menú principal): "))
+    
+    if folio_a_recuperar == 0:
+        return notas_ing, notas_cancel  # Volver al menú principal sin cambios en las notas canceladas
+    
+    if folio_a_recuperar in notas_cancel:
+        datos_g = notas_cancel.pop(folio_a_recuperar)
+        notas_ing[folio_a_recuperar] = datos_g
+        print("Nota recuperada con éxito.")
+    else:
+        print("El folio de nota especificado no existe o corresponde a una nota no cancelada.")
+
+    return notas_ing, notas_cancel
+
+def guardar_csv(notas_ing):
+    with open('notas.csv', 'w', newline='') as archivo:
+        writer = csv.writer(archivo)
+
+        for folio, datos in notas_ing.items():
+            writer.writerow((folio, datos))
+
+def leer_csv(notas_ing):
+        try:
+            with open('notas.csv', 'r', newline='') as archivo:
+                lector = csv.reader(archivo)
+                for fila in lector:
+                    folio, datos = fila
+                    datos = eval(datos)  
+                    folio = int(folio)
+                    notas_ing[folio] = datos
+
+        except FileNotFoundError:
+            print('No existen registros previos. Se iniciará con uno nuevo')
+        return notas_ing
+
+menu()
